@@ -1,0 +1,106 @@
+use rand::{Rng, rng};
+
+pub mod ringbuffer;
+use crate::ringbuffer::RingBuffer;
+
+#[cfg(test)]
+mod tests;
+
+pub struct SimulationConfig {
+        starting_position: StartingPosition,
+        drift_scale: f64,
+        momentum_curve: CurveType,
+        momentum_scale: f64,
+        reversion_curve: CurveType,
+        reversion_scale: f64,
+        clamped: bool,
+}
+
+pub fn simulate(min: f64, max: f64, history: &mut RingBuffer<f64>, config: &SimulationConfig) -> f64 {
+        let mut rng = rng();
+        let range = max - min;
+
+        if history.is_empty() {
+                let offset_modifier = match config.starting_position {
+                        StartingPosition::BottomThird => 0.00,
+                        StartingPosition::MiddleThird => 0.33,
+                        StartingPosition::TopThird => 0.66,
+                };
+                let output = min + range * offset_modifier + range * rng.random::<f64>() * 0.33;
+                history.push(output);
+                return output;
+        }
+
+        let drift_strength = range * config.drift_scale;
+        let drift = rng.random_range(-drift_strength..drift_strength);
+
+        let cache_size = history.len();
+        let momentum = if cache_size == 1 {
+                0.0
+        } else {
+                let mut deltas = Vec::with_capacity(history.len() - 1);
+                let mut iterator = history.iter();
+                let mut prev = iterator.next().expect("Iterator should not be empty; this is a bug!");
+                iterator.for_each(|cur| {
+                        deltas.push(cur - prev);
+                        prev = cur;
+                });
+
+                let weights: Vec<_> = (1..=deltas.len())
+                        .map(|i| {
+                                let i = i as f64;
+                                match config.momentum_curve {
+                                        CurveType::Linear => i,
+                                        CurveType::Quadratic => i.powi(2),
+                                        CurveType::Logarithmic => (i + 1.0).ln(),
+                                }
+                        })
+                        .collect();
+                let average_momentum = deltas.iter().zip(weights.iter()).map(|(d, w)| d * w).sum::<f64>()
+                        / weights.iter().sum::<f64>();
+                average_momentum * config.momentum_scale
+        };
+
+        let centre = (min + max) / 2.0;
+        let current_value = history.last().expect("Ringbuffer should not be empty; this is a bug!");
+        let distance_from_centre = current_value - centre;
+        let reversion_modifier: fn(f64) -> f64 = match config.reversion_curve {
+                CurveType::Linear => |i| i,
+                CurveType::Quadratic => |i| i.powi(2),
+                CurveType::Logarithmic => |i| i.ln(),
+        };
+        let reversion = -distance_from_centre * reversion_modifier(config.reversion_scale);
+
+        let mut next_value = current_value + drift + momentum + reversion;
+        if config.clamped {
+                next_value = next_value.clamp(min, max);
+        }
+        history.push(next_value);
+        next_value
+}
+
+impl Default for SimulationConfig {
+        fn default() -> Self {
+                SimulationConfig {
+                        starting_position: StartingPosition::MiddleThird,
+                        drift_scale: 0.05,
+                        momentum_curve: CurveType::Logarithmic,
+                        momentum_scale: 0.3,
+                        reversion_curve: CurveType::Quadratic,
+                        reversion_scale: 0.05,
+                        clamped: false,
+                }
+        }
+}
+
+pub enum StartingPosition {
+        BottomThird,
+        MiddleThird,
+        TopThird,
+}
+
+pub enum CurveType {
+        Linear,
+        Quadratic,
+        Logarithmic,
+}
