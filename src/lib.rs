@@ -1,11 +1,12 @@
 use rand::{Rng, rng};
 
 pub mod ringbuffer;
-use crate::ringbuffer::RingBuffer;
+pub use crate::ringbuffer::RingBuffer;
 
 #[cfg(test)]
 mod tests;
 
+#[derive(Copy, Clone)]
 pub struct SimulationConfig {
         starting_position: StartingPosition,
         drift_scale: f64,
@@ -16,7 +17,7 @@ pub struct SimulationConfig {
         clamped: bool,
 }
 
-pub fn simulate(min: f64, max: f64, history: &mut RingBuffer<f64>, config: &SimulationConfig) -> f64 {
+pub fn simulate(min: f64, max: f64, history: &mut RingBuffer<f64>, config: SimulationConfig) -> f64 {
         let mut rng = rng();
         let range = max - min;
 
@@ -93,12 +94,14 @@ impl Default for SimulationConfig {
         }
 }
 
+#[derive(Copy, Clone)]
 pub enum StartingPosition {
         BottomThird,
         MiddleThird,
         TopThird,
 }
 
+#[derive(Copy, Clone)]
 pub enum CurveType {
         Linear,
         Quadratic,
