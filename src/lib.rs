@@ -1,3 +1,5 @@
+use std::collections::vec_deque::Iter;
+
 use rand::{Rng, rng};
 
 pub mod ringbuffer;
@@ -17,32 +19,33 @@ pub struct SimulationConfig {
         clamped: bool,
 }
 
-pub fn simulate(min: f64, max: f64, history: &mut RingBuffer<f64>, config: SimulationConfig) -> f64 {
+pub fn simulate(min: f64, max: f64, history: Iter<'_, f64>, config: SimulationConfig) -> f64 {
         let mut rng = rng();
         let range = max - min;
+        let len = history.len();
 
-        if history.is_empty() {
+        if len == 0 {
                 let offset_modifier = match config.starting_position {
                         StartingPosition::BottomThird => 0.00,
                         StartingPosition::MiddleThird => 0.33,
                         StartingPosition::TopThird => 0.66,
                 };
                 let output = min + range * offset_modifier + range * rng.random::<f64>() * 0.33;
-                history.push(output);
                 return output;
         }
 
         let drift_strength = range * config.drift_scale;
         let drift = rng.random_range(-drift_strength..drift_strength);
 
-        let cache_size = history.len();
-        let momentum = if cache_size == 1 {
+        let momentum = if len == 1 {
                 0.0
         } else {
-                let mut deltas = Vec::with_capacity(history.len() - 1);
-                let mut iterator = history.iter();
-                let mut prev = iterator.next().expect("Iterator should not be empty; this is a bug!");
-                iterator.for_each(|cur| {
+                let mut deltas = Vec::with_capacity(len - 1);
+                let mut iter = Iter::clone(&history);
+                let mut prev = iter.next().expect("Iterator should not be empty; this is a bug!");
+
+                let iter = Iter::clone(&history);
+                iter.for_each(|cur| {
                         deltas.push(cur - prev);
                         prev = cur;
                 });
@@ -76,7 +79,6 @@ pub fn simulate(min: f64, max: f64, history: &mut RingBuffer<f64>, config: Simul
         if config.clamped {
                 next_value = next_value.clamp(min, max);
         }
-        history.push(next_value);
         next_value
 }
 

@@ -1,11 +1,11 @@
 use std::collections::{VecDeque, vec_deque::Iter};
 
-pub struct RingBuffer<T> {
+pub struct RingBuffer<T: Copy> {
         buffer: VecDeque<T>,
         capacity: usize,
 }
 
-impl<T> RingBuffer<T> {
+impl<T: Copy> RingBuffer<T> {
         pub fn with_capacity(capacity: usize) -> Self {
                 Self {
                         buffer: VecDeque::with_capacity(capacity),
@@ -38,5 +38,9 @@ impl<T> RingBuffer<T> {
 
         pub fn len(&self) -> usize {
                 self.buffer.len()
+        }
+
+        pub fn slice_end(&self, n: usize) -> Iter<'_, T> {
+                self.buffer.range(self.buffer.len().saturating_sub(n)..)
         }
 }
