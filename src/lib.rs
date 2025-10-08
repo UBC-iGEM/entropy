@@ -1,22 +1,32 @@
 use rand::{Rng, rng};
 
+/// A custom-implemented ringbuffer to store data history
 pub mod ringbuffer;
 pub use crate::ringbuffer::RingBuffer;
 
 #[cfg(test)]
 mod tests;
 
+/// Parameters for configuring simulation behaviour
 #[derive(Copy, Clone)]
 pub struct SimulationConfig {
-    starting_position: StartingPosition,
-    drift_scale: f64,
-    momentum_curve: CurveType,
-    momentum_scale: f64,
-    reversion_curve: CurveType,
-    reversion_scale: f64,
-    clamped: bool,
+    /// Where values with no history should randomly spawn
+    pub starting_position: StartingPosition,
+    /// The weight of drift on simulating values
+    pub drift_scale: f64,
+    /// The curve type used to calculate momentum
+    pub momentum_curve: CurveType,
+    /// The weight of momentum on simulating values
+    pub momentum_scale: f64,
+    /// The curve type used to calculate reversion to the centre
+    pub reversion_curve: CurveType,
+    /// The weight of reversion on simulating values
+    pub reversion_scale: f64,
+    /// Whether simulated values should be hard clamped to the range
+    pub clamped: bool,
 }
 
+/// Simulates a next value from the given history
 pub fn simulate<'a, I: Iterator<Item = &'a f64> + Clone>(
     min: f64,
     max: f64,
@@ -93,6 +103,14 @@ pub fn simulate<'a, I: Iterator<Item = &'a f64> + Clone>(
     next_value
 }
 
+/// Constructs a [`SimulationConfig`] with the following defaults:
+/// - `starting_position`: MiddleThird
+/// - `drift_scale`: 0.05
+/// - `momentum_curve`: Logarithmic
+/// - `momentum_scale`: 0.3
+/// - `reversion_curve`: Quadratic
+/// - `reversion_scale`: 0.05
+/// - `clamped`: `false`
 impl Default for SimulationConfig {
     fn default() -> Self {
         SimulationConfig {
@@ -107,6 +125,7 @@ impl Default for SimulationConfig {
     }
 }
 
+/// A starting position for new simulations
 #[derive(Copy, Clone)]
 pub enum StartingPosition {
     BottomThird,
@@ -114,6 +133,7 @@ pub enum StartingPosition {
     TopThird,
 }
 
+/// A curve type to be used
 #[derive(Copy, Clone)]
 pub enum CurveType {
     Linear,
